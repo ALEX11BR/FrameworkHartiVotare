@@ -2,17 +2,21 @@
 
 import csv
 from collections import defaultdict
-from math import floor
 import os
 
 import matplotlib.pyplot as plt
 
+
+SVG_IN = os.getenv("SVG_IN", "romania-uat.svg")
 CSV_FILE = os.getenv("CSV_FILE", "presence_2024-11-25_07-00.csv")
 OUT_FILE = os.getenv("OUT_FILE", "prezenta-uat.svg")
 
 SIRUTA_FIELD = os.getenv("SIRUTA_FIELD", "Siruta")
 REGISTERED_FIELD = os.getenv("REGISTERED_FIELD", "Înscriși pe liste permanente")
 VOTED_FIELD = os.getenv("VOTED_FIELD", "LT")
+
+COLOR_SCHEME = os.getenv("COLOR_SCHEME", "gist_rainbow")
+DECIMAL_SEP = os.getenv("DECIMAL_SEP", ",")
 
 
 def color_to_rgb(color):
@@ -37,12 +41,12 @@ data_arr = list(data.values())
 data_max = max(data_arr)
 data_min = min(data_arr)
 
-with open("romania-uat.svg", "r") as file:
+with open(SVG_IN, "r") as file:
     svg_base = file.read()
 
 new_styles = ""
 for siruta in data:
-    cmap = plt.get_cmap("gist_rainbow")
+    cmap = plt.get_cmap(COLOR_SCHEME)
 
     color = cmap((data[siruta] - data_min) / (data_max - data_min) * 1)
 
@@ -56,9 +60,9 @@ final_svg = svg_base.replace("</style>", new_styles + "</style>")
 with open(OUT_FILE, "w") as file:
     print(final_svg, file=file)
 
-im = plt.imshow([list(data.values())] * len(data), cmap="gist_rainbow")
+im = plt.pcolor([list(data.values())], cmap=COLOR_SCHEME)
 colorbar = plt.colorbar(im)
 ticks = [data_min] + list(range((int(data_min) // 10 + 1) * 10, int(data_max), 10)) + [data_max]
 colorbar.set_ticks(ticks)
-colorbar.set_ticklabels([f"{i:.1f}%" for i in ticks])
+colorbar.set_ticklabels([f"{i:.1f}%".replace(".", DECIMAL_SEP) for i in ticks])
 plt.show()
