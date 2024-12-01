@@ -18,6 +18,10 @@ VOTED_FIELD = os.getenv("VOTED_FIELD", "LT")
 COLOR_SCHEME = os.getenv("COLOR_SCHEME", "gist_rainbow")
 DECIMAL_SEP = os.getenv("DECIMAL_SEP", ",")
 
+MAP_TITLE_X = int(os.getenv("MAP_TITLE_X", "2580"))
+MAP_TITLE_Y = int(os.getenv("MAP_TITLE_Y", "20"))
+MAP_TITLE = os.getenv("MAP_TITLE", "Prezența per UAT la alegerile\nparlamentare 2024").splitlines()
+
 
 def color_to_rgb(color):
     return f"rgb({int(color[0] * 255)}, {int(color[1] * 255)}, {int(color[2] * 255)})"
@@ -56,13 +60,26 @@ for siruta in data:
         }
     """ % (int(siruta), color_to_rgb(color))
 
-final_svg = svg_base.replace("</style>", new_styles + "</style>")
+svg_defs = '<rect x="0" y="0" fill="white" width="100%" height="100%"/>'
+svg_defs += f'<text font-family="sans-serif" font-weight="bold" dominant-baseline="hanging" text-anchor="middle" x="{MAP_TITLE_X}" y="{MAP_TITLE_Y}" font-size="50">'
+first_line = True
+for title_line in MAP_TITLE:
+    svg_defs += f'<tspan x="{MAP_TITLE_X}" dy="{"0em" if first_line else "1.2em"}">{title_line}</tspan>'
+    first_line = False
+svg_defs += '</text>'
+
+final_svg = svg_base.replace("</style>", new_styles + "</style>" + svg_defs)
 with open(OUT_FILE, "w") as file:
     print(final_svg, file=file)
 
 im = plt.pcolor([list(data.values())], cmap=COLOR_SCHEME)
 colorbar = plt.colorbar(im)
 ticks = [data_min] + list(range((int(data_min) // 10 + 1) * 10, int(data_max), 10)) + [data_max]
+if len(ticks) > 2:
+    if abs(ticks[1] - ticks[0]) < 5:
+        ticks.pop(1)
+    if abs(ticks[-1] - ticks[-2]) < 5:
+        ticks.pop(-2)
 colorbar.set_ticks(ticks)
 colorbar.set_ticklabels([f"{i:.1f}%".replace(".", DECIMAL_SEP) for i in ticks])
 plt.show()
