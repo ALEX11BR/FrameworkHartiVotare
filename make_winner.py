@@ -2,6 +2,7 @@
 
 import csv
 from collections import defaultdict
+from functools import reduce
 import os
 import subprocess
 
@@ -19,14 +20,22 @@ MAP_TITLE_X = int(os.getenv("MAP_TITLE_X", "2580"))
 MAP_TITLE_Y = int(os.getenv("MAP_TITLE_Y", "20"))
 MAP_TITLE = os.getenv("MAP_TITLE", "Candidații cu cele mai multe voturi\ndintr-un UAT la alegerile\nprezidențiale 2024, primul tur").splitlines()
 
-colors = {
-    "CĂLIN GEORGESCU": ["#bb00ff", "#8800cc", "Călin Georgescu (Indep.)"],
-    "ELENA-VALERICA LASCONI": ["#00ccff", "#0099cc", "Elena Lasconi (USR)"],
-    "ION-MARCEL CIOLACU": ["#ff0000", "#aa0000", "Marcel Ciolacu (PSD)"],
-    "GEORGE-NICOLAE SIMION": ["#ffdd00", "#999900", "George Simion (AUR)"],
-    "NICOLAE-IONEL CIUCĂ": ["#0055ff", "#0000ee", "Nicolae Ciucă (PNL)"],
-    "HUNOR KELEMEN": ["#00aa00", "#006600", "Kelemen Hunor (UDMR)"],
-}
+SQUEEZE_THRESH = int(os.getenv("SQUEEZE_THRESH", "10"))
+SQUEEZE_SIZE = int(os.getenv("SQUEEZE_SIZE", "20"))
+
+CANDIDATE_SPEC_FILE = os.getenv("CANDIDATE_SPEC_FILE", "candidate_spec.csv")
+
+with open(CANDIDATE_SPEC_FILE, "r") as file:
+    csv_data = csv.reader(file)
+    candidate_spec = {line[0]: line[1:] for line in csv_data}
+#candidate_spec = {
+#    "CĂLIN GEORGESCU": ["#bb00ff", "#8800cc", "Călin Georgescu (Indep.)"],
+#    "ELENA-VALERICA LASCONI": ["#00ccff", "#0099cc", "Elena Lasconi (USR)"],
+#    "ION-MARCEL CIOLACU": ["#ff0000", "#aa0000", "Marcel Ciolacu (PSD)"],
+#    "GEORGE-NICOLAE SIMION": ["#ffdd00", "#999900", "George Simion (AUR)"],
+#    "NICOLAE-IONEL CIUCĂ": ["#0055ff", "#0000ee", "Nicolae Ciucă (PNL)"],
+#    "HUNOR KELEMEN": ["#00aa00", "#006600", "Kelemen Hunor (UDMR)"],
+#}
 
 data = defaultdict(lambda: defaultdict(lambda: 0))
 
@@ -45,9 +54,11 @@ with open(CSV_FILE, "r", encoding="utf-8-sig") as csv_file:
             data[siruta]["total"] += int(row[c])
 
 winners = defaultdict(lambda: [[], 0])
+votes_of = defaultdict(lambda: 0)
 for siruta in data:
     max_votes = -1
     for c in candidates:
+        votes_of[c.removesuffix("-voturi")] += data[siruta][c]
         if data[siruta][c] == max_votes:
             winners[siruta][0].append(c.removesuffix("-voturi"))
         if data[siruta][c] > max_votes:
@@ -57,6 +68,15 @@ for siruta in data:
 with open(SVG_IN, "r") as file:
     svg_base = file.read()
 
+to_consider = sorted(reduce(lambda a, b: a | b, {frozenset(w[0]) for w in winners.values()}), key=lambda c: votes_of[c], reverse=True)
+for c in to_consider:
+    extra = ""
+    if len([w for w in winners if winners[w][0][0] == c and winners[w][1] > 50]) > 0:
+        extra += "M"
+    if len([w for w in winners if c in winners[w][0] and winners[w][1] <= 50]) > 0:
+        extra += "m"
+    print(f'"{c.replace('"', '""')}","#ffffff","#dddddd","Abrev.{extra}"')
+
 classes = {frozenset(w[0]) for w in winners.values() if len(w[0]) > 1}
 representative_eq = next(filter(lambda c: len(c) > 1, classes), None)
 svg_defs = "<defs>"
@@ -64,7 +84,7 @@ for c in classes:
     svg_defs += f'<pattern id="p{hash(c)}" patternUnits="userSpaceOnUse" width="{STRIPE_SIZE}" height="{STRIPE_SIZE}">'
     x = 0
     for cand in c:
-        svg_defs += f'<rect x="{x}" height="{STRIPE_SIZE}" width="{STRIPE_SIZE / len(c)}" fill="{colors[cand][0]}"/>'
+        svg_defs += f'<rect x="{x}" height="{STRIPE_SIZE}" width="{STRIPE_SIZE / len(c)}" fill="{candidate_spec[cand][0]}"/>'
         x += STRIPE_SIZE / len(c)
     svg_defs += "</pattern>"
 svg_defs += "</defs>"
@@ -80,11 +100,14 @@ svg_defs += '</text>'
 y = LEGEND_Y_START
 svg_defs += f'<text font-family="sans-serif" font-size="22" y="{y - 10}" x="2850" fill="black" text-anchor="middle">≤50%</text>'
 svg_defs += f'<text font-family="sans-serif" font-size="22" y="{y - 10}" x="2950" fill="black" text-anchor="middle">&gt;50%</text>'
-for cand, color in colors.items():
-    svg_defs += f'<rect width="100" height="50" fill="{color[0]}" x="2800" y="{y}" class="rect-candidat"/>'
+for cand, color in candidate_spec.items():
+    if not [w for w in winners if cand in winners[w][0]]:
+        continue
+    if len([w for w in winners if cand in winners[w][0] and winners[w][1] <= 50]) > 0:
+        svg_defs += f'<rect width="100" height="50" fill="{color[0]}" x="2800" y="{y}" class="rect-candidat"/>'
     if len([w for w in winners if winners[w][0][0] == cand and winners[w][1] > 50]) > 0:
         svg_defs += f'<rect width="100" height="50" fill="{color[1]}" x="2900" y="{y}" class="rect-candidat"/>'
-    svg_defs += f'<text font-family="sans-serif" dominant-baseline="central" text-anchor="end" x="2795" y="{y + 25}" font-size="30">{colors[cand][2]}</text>'
+    svg_defs += f'<text font-family="sans-serif" dominant-baseline="central" text-anchor="end" x="2795" y="{y + 25}" font-size="{30 if len(candidate_spec[cand][2]) < SQUEEZE_THRESH else SQUEEZE_SIZE}">{candidate_spec[cand][2]}</text>'
     y += 50
 
 y += 25
@@ -102,9 +125,9 @@ for siruta in winners:
     if len(winners[siruta][0]) > 1:
         fill = f"url(#p{hash(frozenset(winners[siruta][0]))})"
     elif winners[siruta][1] > 50:
-        fill = colors[winners[siruta][0][0]][1]
+        fill = candidate_spec[winners[siruta][0][0]][1]
     else:
-        fill = colors[winners[siruta][0][0]][0]
+        fill = candidate_spec[winners[siruta][0][0]][0]
 
     new_styles += """
         #uat-%d {
