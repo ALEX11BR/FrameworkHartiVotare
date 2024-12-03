@@ -100,13 +100,13 @@ svg_defs += '</text>'
 y = LEGEND_Y_START
 svg_defs += f'<text font-family="sans-serif" font-size="22" y="{y - 10}" x="2850" fill="black" text-anchor="middle">≤50%</text>'
 svg_defs += f'<text font-family="sans-serif" font-size="22" y="{y - 10}" x="2950" fill="black" text-anchor="middle">&gt;50%</text>'
-for cand, color in candidate_spec.items():
+for cand in to_consider:
     if not [w for w in winners if cand in winners[w][0]]:
         continue
     if len([w for w in winners if cand in winners[w][0] and winners[w][1] <= 50]) > 0:
-        svg_defs += f'<rect width="100" height="50" fill="{color[0]}" x="2800" y="{y}" class="rect-candidat"/>'
+        svg_defs += f'<rect width="100" height="50" fill="{candidate_spec[cand][0]}" x="2800" y="{y}" class="rect-candidat"/>'
     if len([w for w in winners if winners[w][0][0] == cand and winners[w][1] > 50]) > 0:
-        svg_defs += f'<rect width="100" height="50" fill="{color[1]}" x="2900" y="{y}" class="rect-candidat"/>'
+        svg_defs += f'<rect width="100" height="50" fill="{candidate_spec[cand][1]}" x="2900" y="{y}" class="rect-candidat"/>'
     svg_defs += f'<text font-family="sans-serif" dominant-baseline="central" text-anchor="end" x="2795" y="{y + 25}" font-size="{30 if len(candidate_spec[cand][2]) < SQUEEZE_THRESH else SQUEEZE_SIZE}">{candidate_spec[cand][2]}</text>'
     y += 50
 
