@@ -2,12 +2,17 @@
 
 import csv
 from collections import defaultdict
+from io import StringIO
+from math import log10
 import os
+import subprocess
+from xml.etree import ElementTree
 
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from matplotlib import cm
 
+SVG_IN = os.getenv("SVG_IN", "romania-uat.svg")
 CSV_FILE_FINAL = os.getenv("CSV_FILE_FINAL", "presence_2024-11-25_07-00.csv")
 CSV_FILE_EARLY = os.getenv("CSV_FILE_EARLY", "presence_2024-11-24_21-00.csv")
 OUT_FILE = os.getenv("OUT_FILE", "prezenta-uat.svg")
@@ -16,15 +21,40 @@ SIRUTA_FIELD = os.getenv("SIRUTA_FIELD", "Siruta")
 REGISTERED_FIELD = os.getenv("REGISTERED_FIELD", "Înscriși pe liste permanente")
 VOTED_FIELD = os.getenv("VOTED_FIELD", "LT")
 
+TICKS_MIN_DISTANCE = float(os.getenv("TICKS_MIN_DISTANCE", "0.5"))
+
 COLOR_SCHEME = os.getenv("COLOR_SCHEME", "cool")
+FONT_FAMILY = os.getenv("FONT_FAMILY", '"DejaVu Sans", sans-serif')
 
 MAP_TITLE_X = int(os.getenv("MAP_TITLE_X", "2580"))
 MAP_TITLE_Y = int(os.getenv("MAP_TITLE_Y", "20"))
-MAP_TITLE = os.getenv("MAP_TITLE", "Numărul de voturi exprimate după\nora 21 (închiderea normală a\nurnelor) per UAT la alegerile\nparlamentare din 2024").splitlines()
+MAP_TITLE = os.getenv("MAP_TITLE", "Numărul de voturi exprimate\ndupă ora 21 (închiderea\nnormală a urnelor) per UAT\nla alegerile prezidențiale\ndin 2025").splitlines()
+
+LEGEND_X = int(os.getenv("LEGEND_X", "750"))
+LEGEND_Y = int(os.getenv("LEGEND_Y", "90"))
+LEGEND_SCALE = float(os.getenv("LEGEND_SCALE", "3.5"))
 
 
 def color_to_rgb(color):
     return f"rgb({int(color[0] * 255)}, {int(color[1] * 255)}, {int(color[2] * 255)})"
+
+
+def get_ticks(data_max, ticks_end_min_distance=TICKS_MIN_DISTANCE):
+    ticks = []
+    power10 = 1
+    while power10 < data_max:
+        for sub_elem in [1, 2, 5]:
+            tick = sub_elem * power10
+            if tick > data_max:
+                break
+            ticks.append(tick)
+        power10 *= 10
+    ticks.append(data_max)
+
+    delta = ticks[-1] - ticks[-2]
+    if delta / (10 ** log10(delta)) < ticks_end_min_distance:
+        ticks.pop(-2)
+    return ticks
 
 
 data = defaultdict(lambda: [0, 0])
@@ -52,7 +82,7 @@ data_arr = list(data.values())
 data_max = max(data_arr)
 data_min = min(data_arr)
 
-with open("romania-uat.svg", "r") as file:
+with open(SVG_IN, "r") as file:
     svg_base = file.read()
 
 color_mapping = cm.ScalarMappable(norm=LogNorm(1, data_max), cmap=plt.get_cmap(COLOR_SCHEME))
@@ -73,20 +103,33 @@ for siruta in data:
     """ % (int(siruta), color)
 
 svg_defs = '<rect x="0" y="0" fill="white" width="100%" height="100%"/>'
-svg_defs += f'<text font-family="sans-serif" font-weight="bold" dominant-baseline="hanging" text-anchor="middle" x="{MAP_TITLE_X}" y="{MAP_TITLE_Y}" font-size="50">'
+svg_defs += f'<text font-family=\'{FONT_FAMILY}\' font-weight="bold" dominant-baseline="hanging" text-anchor="middle" x="{MAP_TITLE_X}" y="{MAP_TITLE_Y}" font-size="50">'
 first_line = True
 for title_line in MAP_TITLE:
     svg_defs += f'<tspan x="{MAP_TITLE_X}" dy="{"0em" if first_line else "1.2em"}">{title_line}</tspan>'
     first_line = False
 svg_defs += '</text>'
 
+im = plt.pcolor([[1, data_max]], cmap=COLOR_SCHEME, norm=LogNorm(1, data_max))
+plt.gca().set_visible(False)
+colorbar = plt.colorbar(im)
+ticks = get_ticks(data_max)
+colorbar.set_ticks(ticks)
+colorbar.set_ticklabels(ticks)
+
+svg_content = StringIO()
+plt.savefig(svg_content, format="svg", bbox_inches="tight", pad_inches=0)
+svg_content.seek(0)
+
+svg_data = svg_content.read()
+svg_content.close()
+
+svg_xml = ElementTree.fromstring(svg_data)
+graph = svg_xml.find(".//*[@id='axes_1']")
+graph.set("transform", f"scale({LEGEND_SCALE} {LEGEND_SCALE}) translate({LEGEND_X} {LEGEND_Y})")
+svg_defs += ElementTree.tostring(graph, encoding="unicode")
+
 final_svg = svg_base.replace("</style>", new_styles + "</style>" + svg_defs)
 with open(OUT_FILE, "w") as file:
     print(final_svg, file=file)
-
-im = plt.pcolor([[1, data_max]], cmap=COLOR_SCHEME, norm=LogNorm(1, data_max))
-colorbar = plt.colorbar(im)
-ticks = [1, 2, 5, 10, 20, data_max]
-colorbar.set_ticks(ticks)
-colorbar.set_ticklabels(ticks)
-plt.show()
+subprocess.run(["./text-to-path.sh", OUT_FILE])

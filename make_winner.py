@@ -14,11 +14,12 @@ SIRUTA_FIELD = os.getenv("SIRUTA_FIELD", "uat_siruta")
 REGISTERED_FIELD = os.getenv("REGISTERED_FIELD", "Înscriși pe liste permanente")
 VOTED_FIELD = os.getenv("VOTED_FIELD", "LT")
 
+FONT_FAMILY = os.getenv("FONT_FAMILY", '"DejaVu Sans", sans-serif')
 STRIPE_SIZE = int(os.getenv("VOTED_FIELD", "10"))
 LEGEND_Y_START = int(os.getenv("LEGEND_Y_START", "220"))
 MAP_TITLE_X = int(os.getenv("MAP_TITLE_X", "2580"))
 MAP_TITLE_Y = int(os.getenv("MAP_TITLE_Y", "20"))
-MAP_TITLE = os.getenv("MAP_TITLE", "Candidații cu cele mai multe voturi\ndintr-un UAT la alegerile\nprezidențiale 2024, primul tur").splitlines()
+MAP_TITLE = os.getenv("MAP_TITLE", "Candidații cu cele mai multe\nvoturi dintr-un UAT la alegerile\nprezidențiale 2025, turul 1").splitlines()
 
 SQUEEZE_THRESH = int(os.getenv("SQUEEZE_THRESH", "10"))
 SQUEEZE_SIZE = int(os.getenv("SQUEEZE_SIZE", "20"))
@@ -90,7 +91,7 @@ for c in classes:
 svg_defs += "</defs>"
 
 svg_defs += f'<rect x="0" y="0" fill="white" width="100%" height="100%"/>'
-svg_defs += f'<text font-family="sans-serif" font-weight="bold" dominant-baseline="hanging" text-anchor="middle" x="{MAP_TITLE_X}" y="{MAP_TITLE_Y}" font-size="50">'
+svg_defs += f'<text font-family=\'{FONT_FAMILY}\' font-weight="bold" dominant-baseline="hanging" text-anchor="middle" x="{MAP_TITLE_X}" y="{MAP_TITLE_Y}" font-size="50">'
 first_line = True
 for title_line in MAP_TITLE:
     svg_defs += f'<tspan x="{MAP_TITLE_X}" dy="{"0em" if first_line else "1.2em"}">{title_line}</tspan>'
@@ -98,8 +99,8 @@ for title_line in MAP_TITLE:
 svg_defs += '</text>'
 
 y = LEGEND_Y_START
-svg_defs += f'<text font-family="sans-serif" font-size="22" y="{y - 10}" x="2850" fill="black" text-anchor="middle">≤50%</text>'
-svg_defs += f'<text font-family="sans-serif" font-size="22" y="{y - 10}" x="2950" fill="black" text-anchor="middle">&gt;50%</text>'
+svg_defs += f'<text font-family=\'{FONT_FAMILY}\' font-size="22" y="{y - 10}" x="2850" fill="black" text-anchor="middle">≤50%</text>'
+svg_defs += f'<text font-family=\'{FONT_FAMILY}\' font-size="22" y="{y - 10}" x="2950" fill="black" text-anchor="middle">&gt;50%</text>'
 for cand in to_consider:
     if not [w for w in winners if cand in winners[w][0]]:
         continue
@@ -107,13 +108,13 @@ for cand in to_consider:
         svg_defs += f'<rect width="100" height="50" fill="{candidate_spec[cand][0]}" x="2800" y="{y}" class="rect-candidat"/>'
     if len([w for w in winners if winners[w][0][0] == cand and winners[w][1] > 50]) > 0:
         svg_defs += f'<rect width="100" height="50" fill="{candidate_spec[cand][1]}" x="2900" y="{y}" class="rect-candidat"/>'
-    svg_defs += f'<text font-family="sans-serif" dominant-baseline="central" text-anchor="end" x="2795" y="{y + 25}" font-size="{30 if len(candidate_spec[cand][2]) < SQUEEZE_THRESH else SQUEEZE_SIZE}">{candidate_spec[cand][2]}</text>'
+    svg_defs += f'<text font-family=\'{FONT_FAMILY}\' dominant-baseline="central" text-anchor="end" x="2795" y="{y + 25}" font-size="{30 if len(candidate_spec[cand][2]) < SQUEEZE_THRESH else SQUEEZE_SIZE}">{candidate_spec[cand][2]}</text>'
     y += 50
 
 y += 25
 if representative_eq:
     svg_defs += f'<rect width="200" height="50" fill="url(#p{hash(representative_eq)})" x="2800" y="{y}" class="rect-candidat"/>'
-    svg_defs += f'<text font-family="sans-serif" dominant-baseline="central" text-anchor="end" x="2795" y="{y + 25}" font-size="30">Egalitate</text>'
+    svg_defs += f'<text font-family=\'{FONT_FAMILY}\' dominant-baseline="central" text-anchor="end" x="2795" y="{y + 25}" font-size="30">Egalitate</text>'
 
 new_styles = """
     .rect-candidat {

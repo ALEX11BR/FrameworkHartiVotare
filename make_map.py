@@ -2,7 +2,10 @@
 
 import csv
 from collections import defaultdict
+from io import StringIO
 import os
+import subprocess
+from xml.etree import ElementTree
 
 import matplotlib.pyplot as plt
 
@@ -15,12 +18,20 @@ SIRUTA_FIELD = os.getenv("SIRUTA_FIELD", "Siruta")
 REGISTERED_FIELD = os.getenv("REGISTERED_FIELD", "Înscriși pe liste permanente")
 VOTED_FIELD = os.getenv("VOTED_FIELD", "LT")
 
+TICKS_MIN_DISTANCE = float(os.getenv("TICKS_MIN_DISTANCE", "2.5"))
+TICKS_REGULAR_INTERVAL = int(os.getenv("TICKS_REGULAR_INTERVAL", "10"))
+
 COLOR_SCHEME = os.getenv("COLOR_SCHEME", "gist_rainbow")
 DECIMAL_SEP = os.getenv("DECIMAL_SEP", ",")
+FONT_FAMILY = os.getenv("FONT_FAMILY", '"DejaVu Sans", sans-serif')
 
 MAP_TITLE_X = int(os.getenv("MAP_TITLE_X", "2580"))
 MAP_TITLE_Y = int(os.getenv("MAP_TITLE_Y", "20"))
-MAP_TITLE = os.getenv("MAP_TITLE", "Prezența per UAT la alegerile\nparlamentare 2024").splitlines()
+MAP_TITLE = os.getenv("MAP_TITLE", "Prezența per UAT la alegerile\nprezidențiale 2025, turul 1").splitlines()
+
+LEGEND_X = int(os.getenv("LEGEND_X", "290"))
+LEGEND_Y = int(os.getenv("LEGEND_Y", "0"))
+LEGEND_SCALE = float(os.getenv("LEGEND_SCALE", "4"))
 
 
 def color_to_rgb(color):
@@ -61,25 +72,38 @@ for siruta in data:
     """ % (int(siruta), color_to_rgb(color))
 
 svg_defs = '<rect x="0" y="0" fill="white" width="100%" height="100%"/>'
-svg_defs += f'<text font-family="sans-serif" font-weight="bold" dominant-baseline="hanging" text-anchor="middle" x="{MAP_TITLE_X}" y="{MAP_TITLE_Y}" font-size="50">'
+svg_defs += f'<text font-family=\'{FONT_FAMILY}\' font-weight="bold" dominant-baseline="hanging" text-anchor="middle" x="{MAP_TITLE_X}" y="{MAP_TITLE_Y}" font-size="50">'
 first_line = True
 for title_line in MAP_TITLE:
     svg_defs += f'<tspan x="{MAP_TITLE_X}" dy="{"0em" if first_line else "1.2em"}">{title_line}</tspan>'
     first_line = False
 svg_defs += '</text>'
 
-final_svg = svg_base.replace("</style>", new_styles + "</style>" + svg_defs)
-with open(OUT_FILE, "w") as file:
-    print(final_svg, file=file)
-
 im = plt.pcolor([list(data.values())], cmap=COLOR_SCHEME)
+plt.gca().set_visible(False)
 colorbar = plt.colorbar(im)
-ticks = [data_min] + list(range((int(data_min) // 10 + 1) * 10, int(data_max), 10)) + [data_max]
+ticks = [data_min] + list(range((int(data_min) // TICKS_REGULAR_INTERVAL + 1) * TICKS_REGULAR_INTERVAL, int(data_max), TICKS_REGULAR_INTERVAL)) + [data_max]
 if len(ticks) > 2:
-    if abs(ticks[1] - ticks[0]) < 5:
+    if abs(ticks[1] - ticks[0]) < TICKS_MIN_DISTANCE:
         ticks.pop(1)
-    if abs(ticks[-1] - ticks[-2]) < 5:
+    if abs(ticks[-1] - ticks[-2]) < TICKS_MIN_DISTANCE:
         ticks.pop(-2)
 colorbar.set_ticks(ticks)
 colorbar.set_ticklabels([f"{i:.1f}%".replace(".", DECIMAL_SEP) for i in ticks])
-plt.show()
+
+svg_content = StringIO()
+plt.savefig(svg_content, format="svg")
+svg_content.seek(0)
+
+svg_data = svg_content.read()
+svg_content.close()
+
+svg_xml = ElementTree.fromstring(svg_data)
+graph = svg_xml.find(".//*[@id='axes_1']")
+graph.set("transform", f"scale({LEGEND_SCALE} {LEGEND_SCALE}) translate({LEGEND_X} {LEGEND_Y})")
+svg_defs += ElementTree.tostring(graph, encoding="unicode")
+
+final_svg = svg_base.replace("</style>", new_styles + "</style>" + svg_defs)
+with open(OUT_FILE, "w") as file:
+    print(final_svg, file=file)
+subprocess.run(["./text-to-path.sh", OUT_FILE])
