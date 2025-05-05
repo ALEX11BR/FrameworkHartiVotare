@@ -100,7 +100,7 @@ svg_defs += '</text>'
 y = LEGEND_Y_START
 svg_defs += f'<text font-family=\'{FONT_FAMILY}\' font-size="22" y="{y - 10}" x="2850" fill="black" text-anchor="middle">≤50%</text>'
 svg_defs += f'<text font-family=\'{FONT_FAMILY}\' font-size="22" y="{y - 10}" x="2950" fill="black" text-anchor="middle">&gt;50%</text>'
-for cand in to_consider:
+for cand in candidate_spec:
     if not [w for w in winners if cand in winners[w][0]]:
         continue
     if len([w for w in winners if cand in winners[w][0] and winners[w][1] <= 50]) > 0:
