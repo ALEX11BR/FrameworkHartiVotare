@@ -10,9 +10,9 @@ from xml.etree import ElementTree
 import matplotlib.pyplot as plt
 
 
-SVG_IN = os.getenv("SVG_IN", "romania-uat.svg")
-CSV_FILE = os.getenv("CSV_FILE", "presence_2024-11-25_07-00.csv")
-OUT_FILE = os.getenv("OUT_FILE", "prezenta-uat.svg")
+SVG_IN = os.getenv("SVG_IN", "harti/romania-uat.svg")
+CSV_FILE = os.getenv("CSV_FILE", "info-voturi/presence_2025-05-04_21-00.csv")
+OUT_FILE = os.getenv("OUT_FILE", "harti/prezenta-uat-XXXX-YYYY.svg")
 
 SIRUTA_FIELD = os.getenv("SIRUTA_FIELD", "Siruta")
 REGISTERED_FIELD = os.getenv("REGISTERED_FIELD", "Înscriși pe liste permanente")
