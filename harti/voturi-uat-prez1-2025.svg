@@ -1545,7 +1545,7 @@
         }
     
         #uat-28709 {
-            fill: url(#p7939176162684064600);
+            fill: url(#p-6534592036466614996);
         }
     
         #uat-28246 {
@@ -12771,7 +12771,7 @@
   <defs
      id="defs2">
     <pattern
-       id="p7939176162684064600"
+       id="p-6534592036466614996"
        patternUnits="userSpaceOnUse"
        width="10"
        height="10">
@@ -12779,13 +12779,13 @@
          x="0"
          height="10"
          width="5.0"
-         fill="#00aa00"
+         fill="#ffdd00"
          id="rect1" />
       <rect
          x="5.0"
          height="10"
          width="5.0"
-         fill="#ffdd00"
+         fill="#00aa00"
          id="rect2" />
     </pattern>
   </defs>
@@ -12899,7 +12899,7 @@
   <rect
      width="200"
      height="50"
-     fill="url(#p7939176162684064600)"
+     fill="url(#p-6534592036466614996)"
      x="2800"
      y="445"
      class="rect-candidat"
