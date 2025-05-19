@@ -14,6 +14,7 @@ SIRUTA_FIELD = os.getenv("SIRUTA_FIELD", "uat_siruta")
 
 FONT_FAMILY = os.getenv("FONT_FAMILY", '"DejaVu Sans", sans-serif')
 STRIPE_SIZE = int(os.getenv("VOTED_FIELD", "10"))
+LEGEND_X_START = int(os.getenv("LEGEND_X_START", "2800"))
 LEGEND_Y_START = int(os.getenv("LEGEND_Y_START", "220"))
 MAP_TITLE_X = int(os.getenv("MAP_TITLE_X", "2580"))
 MAP_TITLE_Y = int(os.getenv("MAP_TITLE_Y", "20"))
@@ -24,6 +25,21 @@ SQUEEZE_THRESH = int(os.getenv("SQUEEZE_THRESH", "10"))
 SQUEEZE_SIZE = int(os.getenv("SQUEEZE_SIZE", "20"))
 
 CANDIDATE_SPEC_FILE = os.getenv("CANDIDATE_SPEC_FILE", "info-candidati/prez1-2025.csv")
+CANDIDATE_THRESHOLDS = [int(el) for el in os.getenv("CANDIDATE_THRESHOLDS", "50").split(",")]
+
+
+def get_threshold(percent: float, thresholds: list[int] = CANDIDATE_THRESHOLDS) -> int:
+    """
+    Get the threshold for a given percentage.
+    :param percent: The percentage to check.
+    :param thresholds: The list of thresholds.
+    :return: The threshold for the given percentage.
+    """
+    for i in range(len(thresholds)):
+        if percent <= thresholds[i]:
+            return i
+    return len(thresholds)
+
 
 with open(CANDIDATE_SPEC_FILE, "r") as file:
     csv_data = csv.reader(file)
@@ -53,6 +69,7 @@ with open(CSV_FILE, "r", encoding="utf-8-sig") as csv_file:
             data[siruta][c] += int(row[c])
             data[siruta]["total"] += int(row[c])
 
+# winners = {"1023": [["ionescu", "popescu"], 25.0]}
 winners = defaultdict(lambda: [[], 0])
 votes_of = defaultdict(lambda: 0)
 for siruta in data:
@@ -69,23 +86,21 @@ with open(SVG_IN, "r") as file:
     svg_base = file.read()
 
 to_consider = sorted(reduce(lambda a, b: a | b, {frozenset(w[0]) for w in winners.values()}), key=lambda c: votes_of[c], reverse=True)
+threshes_by_cand = {}
 for c in to_consider:
-    extra = ""
-    if len([w for w in winners if winners[w][0][0] == c and winners[w][1] > 50]) > 0:
-        extra += "M"
-    if len([w for w in winners if c in winners[w][0] and winners[w][1] <= 50]) > 0:
-        extra += "m"
-    print(f'"{c.replace('"', '""')}","#ffffff","#dddddd","Abrev.{extra}"')
+    threshes_by_cand[c] = sorted({get_threshold(winners[w][1]) for w in winners if c in winners[w][0]})
+    extra = str(threshes_by_cand[c])
+    print(f'"{c.replace('"', '""')}"{',"#ffffff"' * len(CANDIDATE_THRESHOLDS)},"#dddddd","Abrev.{extra}"')
 
-classes = {frozenset(w[0]) for w in winners.values() if len(w[0]) > 1}
+classes = {(frozenset(w[0]), get_threshold(w[1])) for w in winners.values() if len(w[0]) > 1}
 representative_eq = next(filter(lambda c: len(c) > 1, classes), None)
 svg_defs = "<defs>"
 for c in classes:
     svg_defs += f'<pattern id="p{hash(c)}" patternUnits="userSpaceOnUse" width="{STRIPE_SIZE}" height="{STRIPE_SIZE}">'
     x = 0
-    for cand in c:
-        svg_defs += f'<rect x="{x}" height="{STRIPE_SIZE}" width="{STRIPE_SIZE / len(c)}" fill="{candidate_spec[cand][0]}"/>'
-        x += STRIPE_SIZE / len(c)
+    for cand in c[0]:
+        svg_defs += f'<rect x="{x}" height="{STRIPE_SIZE}" width="{STRIPE_SIZE / len(c[0])}" fill="{candidate_spec[cand][c[1]]}"/>'
+        x += STRIPE_SIZE / len(c[0])
     svg_defs += "</pattern>"
 svg_defs += "</defs>"
 
@@ -98,22 +113,21 @@ for title_line in MAP_TITLE:
 svg_defs += '</text>'
 
 y = LEGEND_Y_START
-svg_defs += f'<text font-family=\'{FONT_FAMILY}\' font-size="22" y="{y - 10}" x="2850" fill="black" text-anchor="middle">≤50%</text>'
-svg_defs += f'<text font-family=\'{FONT_FAMILY}\' font-size="22" y="{y - 10}" x="2950" fill="black" text-anchor="middle">&gt;50%</text>'
+for t in range(len(CANDIDATE_THRESHOLDS)):
+    svg_defs += f'<text font-family=\'{FONT_FAMILY}\' font-size="22" y="{y - 10}" x="{LEGEND_X_START + t * 100 + 50}" fill="black" text-anchor="middle">≤{CANDIDATE_THRESHOLDS[t]}%</text>'
+svg_defs += f'<text font-family=\'{FONT_FAMILY}\' font-size="22" y="{y - 10}" x="{LEGEND_X_START + len(CANDIDATE_THRESHOLDS) * 100 + 50}" fill="black" text-anchor="middle">&gt;{CANDIDATE_THRESHOLDS[-1]}%</text>'
 for cand in candidate_spec:
     if not [w for w in winners if cand in winners[w][0]]:
         continue
-    if len([w for w in winners if cand in winners[w][0] and winners[w][1] <= 50]) > 0:
-        svg_defs += f'<rect width="100" height="50" fill="{candidate_spec[cand][0]}" x="2800" y="{y}" class="rect-candidat"/>'
-    if len([w for w in winners if winners[w][0][0] == cand and winners[w][1] > 50]) > 0:
-        svg_defs += f'<rect width="100" height="50" fill="{candidate_spec[cand][1]}" x="2900" y="{y}" class="rect-candidat"/>'
-    svg_defs += f'<text font-family=\'{FONT_FAMILY}\' dominant-baseline="central" text-anchor="end" x="2795" y="{y + 25}" font-size="{NORMAL_SIZE if len(candidate_spec[cand][2]) < SQUEEZE_THRESH else SQUEEZE_SIZE}">{candidate_spec[cand][2]}</text>'
+    for thresh in threshes_by_cand[cand]:
+        svg_defs += f'<rect width="100" height="50" fill="{candidate_spec[cand][thresh]}" x="{LEGEND_X_START + thresh * 100}" y="{y}" class="rect-candidat"/>'
+    svg_defs += f'<text font-family=\'{FONT_FAMILY}\' dominant-baseline="central" text-anchor="end" x="{LEGEND_X_START - 5}" y="{y + 25}" font-size="{NORMAL_SIZE if len(candidate_spec[cand][-1]) < SQUEEZE_THRESH else SQUEEZE_SIZE}">{candidate_spec[cand][-1]}</text>'
     y += 50
 
 y += 25
 if representative_eq:
-    svg_defs += f'<rect width="200" height="50" fill="url(#p{hash(representative_eq)})" x="2800" y="{y}" class="rect-candidat"/>'
-    svg_defs += f'<text font-family=\'{FONT_FAMILY}\' dominant-baseline="central" text-anchor="end" x="2795" y="{y + 25}" font-size="{NORMAL_SIZE}">Egalitate</text>'
+    svg_defs += f'<rect width="{(len(CANDIDATE_THRESHOLDS) + 1) * 100}" height="50" fill="url(#p{hash(representative_eq)})" x="{LEGEND_X_START}" y="{y}" class="rect-candidat"/>'
+    svg_defs += f'<text font-family=\'{FONT_FAMILY}\' dominant-baseline="central" text-anchor="end" x="{LEGEND_X_START - 5}" y="{y + 25}" font-size="{NORMAL_SIZE}">Egalitate</text>'
 
 new_styles = """
     .rect-candidat {
@@ -123,11 +137,9 @@ new_styles = """
 """
 for siruta in winners:
     if len(winners[siruta][0]) > 1:
-        fill = f"url(#p{hash(frozenset(winners[siruta][0]))})"
-    elif winners[siruta][1] > 50:
-        fill = candidate_spec[winners[siruta][0][0]][1]
+        fill = f"url(#p{hash((frozenset(winners[siruta][0]), get_threshold(winners[siruta][1])))})"
     else:
-        fill = candidate_spec[winners[siruta][0][0]][0]
+        fill = candidate_spec[winners[siruta][0][0]][get_threshold(winners[siruta][1])]
 
     new_styles += """
         #uat-%d {
