@@ -71,7 +71,7 @@ for siruta in data:
         }
     """ % (int(siruta), color_to_rgb(color))
 
-svg_defs = '<rect x="0" y="0" fill="white" width="100%" height="100%"/>'
+svg_defs = ''
 svg_defs += f'<text font-family=\'{FONT_FAMILY}\' font-weight="bold" dominant-baseline="hanging" text-anchor="middle" x="{MAP_TITLE_X}" y="{MAP_TITLE_Y}" font-size="50">'
 first_line = True
 for title_line in MAP_TITLE:

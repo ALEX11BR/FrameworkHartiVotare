@@ -19,3 +19,19 @@ Fișierele din repository:
 - `info-voturi` - CSV-urile de la ROAEP
 - fișiere `.geojson` cu date brute despre UAT-uri
     - cele ce nu sunt cu `wgs84` folosesc coordonate conform `Romania_double_stereo.wkt`
+    - bazate pe limitele din [geoportalul ANCPI](https://geoportal.ancpi.ro/portal/apps/webappviewer/index.html?id=faeba2d173374445b1f13512bd477bb2)
+    - prelucrate cu QGIS pentru a fi mai „simple” - mai puține puncte
+        - nu mai știu exact ce pași le-am aplicat fișierelor fără an în denumire
+            - nu au câmpul `countyName`
+            - dar cele cu județe au câmpul `judet` cu codul auto al județului
+        - las mai jos pașii de prelucrare - folosiți în fișierele cu `2025` în nume - aplicat pe versiunile brute de pe [geoportalul ANCPI](https://geoportal.ancpi.ro/portal/apps/webappviewer/index.html?id=faeba2d173374445b1f13512bd477bb2) cu coordonate conform `Romania_double_stereo.wkt`
+            - `v.generalize` din GRASS cu algoritmul *reumann*, *Maximal tolerance value* `500`, *v.in.ogr snap tolerance* `0.0001` (se găsește la *Advanced parameters*)
+                - prima simplificare, dă unor UAT-uri mici o formă vizibilă la dimensiunea hărții
+            - `v.generalize` din GRASS de 3 ori cu algoritmul *reduction*, *Maximal tolerance value* de `750`, apoi `500`, apoi `250`, *v.in.ogr snap tolerance* `0.0001`
+                - simplifică unele chestii ignorate de simplificările precedente
+                - aplicăm progresiv aceste valori de toleranță deoarece există granițe de UAT-uri ce nu se simplifică la valori mai mari dar se simplifică la valori mai mici
+            - *Dissolve* cu *Dissolve field* `natCode`
+            - adăugat județul de care aparține fiecare UAT într-un câmp `countyName`
+                - de ex. prin *join* cu date din `info-voturi`
+            - eliminat de câmpuri `fid`, `cat`
+            - *Dissolve* cu *Dissolve field* `countyName` pentru a obține contururile județelor

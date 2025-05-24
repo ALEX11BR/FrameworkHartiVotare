@@ -5,8 +5,8 @@ from math import ceil
 import os
 
 
-UNITS_GEOJSON = os.getenv("UNITS_GEOJSON", "ro-comune-simplificate.geojson")
-COUNTIES_GEOJSON = os.getenv("COUNTIES_GEOJSON", "ro-judete-simplificate.geojson")
+UNITS_GEOJSON = os.getenv("UNITS_GEOJSON", "ro-comune-simplificate-2025.geojson")
+COUNTIES_GEOJSON = os.getenv("COUNTIES_GEOJSON", "ro-judete-simplificate-2025.geojson")
 MAP_WIDTH = int(os.getenv("MAP_WIDTH", "3000"))
 MAP_BUFFER = int(os.getenv("MAP_BUFFER", "10"))
 
@@ -26,6 +26,13 @@ def convert_between_ranges(point, from_range: CoordRange, to_range: CoordRange):
                                            from_range.start_y) * (to_range.end_y - to_range.start_y) + to_range.start_y
 
     return [x, y]
+
+
+def feature_title(feature):
+    ans = feature["properties"]["name"]
+    if feature["properties"]["natLevName"] not in ["Sectoarele municipiului Bucuresti"]:
+        ans += f' ({feature["properties"]["countyName"]})'
+    return ans
 
 
 with open(UNITS_GEOJSON, "r") as file:
@@ -51,14 +58,18 @@ print("""<style>
         fill: none;
         stroke: black;
         stroke-width: 2.5px;
+        stroke-linejoin: round;
     }
     .uat {
         fill: grey;
         stroke: black;
         stroke-width: 1.5px;
+        stroke-linejoin: round;
     }
 </style>""")
 
+print(f'<rect x="0" y="0" fill="white" width="{map_range.end_x + MAP_BUFFER}" height="{
+    ceil(map_range.end_y) + MAP_BUFFER}"/>')
 for feature in geojson["features"]:
     print(
         f'<path id="uat-{feature["properties"]["natCode"]}" class="uat" d="', end="")
@@ -72,10 +83,10 @@ for feature in geojson["features"]:
                 print(f"{c}{point[0]:.2f},{point[1]:.2f} ", end="")
                 c = "L"
             print("Z ", end="")
-    print(f'"><title>{feature["properties"]["name"]}</title></path>')
+    print(f'"><title>{feature_title(feature)}</title></path>')
 
 for feature in geojson_judete["features"]:
-    print(f'<path id="judet-{feature["properties"]["judet"]}" class="judet" d="', end="")
+    print(f'<path class="judet" d="', end="")
     # c1 = poligoanele distincte ce alcătuiesc un UAT
     for c1 in feature["geometry"]["coordinates"]:
         for c2 in c1:  # c2 = [poligon extern, eventuale găuri...]
